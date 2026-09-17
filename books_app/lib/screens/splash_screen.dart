@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../main.dart'; // To access MyHomePage
+import 'home_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -41,12 +41,12 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const MyHomePage(title: 'Flutter Demo Home Page'),
+                const HomePage(),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
-            transitionDuration: const Duration(milliseconds: 500),
+            transitionDuration: const Duration(milliseconds: 2000),
           ),
         );
       }
@@ -67,11 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
         child: ScaleTransition(
           scale: _animation,
           // replace with Image.asset('assets/your_image.png')
-          child: Icon(
-            Icons.menu_book,
-            size: 100,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+          child: Icon(Icons.menu_book, size: 100, color: Colors.amber),
         ),
       ),
     );
