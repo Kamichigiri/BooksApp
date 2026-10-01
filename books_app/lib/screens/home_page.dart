@@ -1,73 +1,8 @@
+import 'package:books_app/domain/database/app_database.dart';
+import 'package:books_app/domain/models/books.dart';
+import 'package:books_app/screens/book_reader_screen.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-
-/// A premium, beautiful Book representation.
-class Book {
-  final String title;
-  final String author;
-  final String coverUrl;
-  final double rating;
-  final String category;
-
-  const Book({
-    required this.title,
-    required this.author,
-    required this.coverUrl,
-    required this.rating,
-    required this.category,
-  });
-}
-
-/// A curated list of beautiful sample books with high-quality cover images.
-const List<Book> sampleBooks = [
-  Book(
-    title: 'The Great Odyssey',
-    author: 'Homer & Scholars',
-    coverUrl:
-        'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=400',
-    rating: 4.8,
-    category: 'Classics',
-  ),
-  Book(
-    title: 'Design Systems',
-    author: 'Alla Kholmatova',
-    coverUrl:
-        'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400',
-    rating: 4.9,
-    category: 'Design',
-  ),
-  Book(
-    title: 'Echoes of the Past',
-    author: 'Marcus Aurelius',
-    coverUrl:
-        'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=400',
-    rating: 4.7,
-    category: 'Philosophy',
-  ),
-  Book(
-    title: 'Chronicles of Space',
-    author: 'Dr. Evelyn Carter',
-    coverUrl:
-        'https://images.unsplash.com/photo-1610116306796-6fea9f4fae38?auto=format&fit=crop&q=80&w=400',
-    rating: 4.5,
-    category: 'Sci-Fi',
-  ),
-  Book(
-    title: 'Silent Whispers',
-    author: 'Sarah J. Penner',
-    coverUrl:
-        'https://images.unsplash.com/photo-1618666012174-83b441c0bc76?auto=format&fit=crop&q=80&w=400',
-    rating: 4.6,
-    category: 'Mystery',
-  ),
-  Book(
-    title: 'The Path of Wisdom',
-    author: 'Alan Watts',
-    coverUrl:
-        'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=400',
-    rating: 4.9,
-    category: 'Philosophy',
-  ),
-];
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -79,36 +14,388 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool _isLoading = true;
   String _selectedCategory = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  List<Book> _books = [];
+  List<Book> _continueReadingBooks = [];
+  List<String> _categories = [
+    'All',
+    'Philosophy',
+    'Design',
+    'Classics',
+    'Sci-Fi',
+    'Mystery'
+  ];
+  int _totalBooksCount = 0;
 
   @override
   void initState() {
     super.initState();
-    // Simulate initial loading to showcase the gorgeous skeleton placeholders
-    _simulateLoading();
+    _loadBooks();
   }
 
-  void _simulateLoading() {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Fetch all books and metadata from SQLite
+  Future<void> _loadBooks() async {
+    setState(() => _isLoading = true);
+
+    // Ensure database contains initial default books if empty
+    await AppDatabase.instance.seedInitialDataIfEmpty();
+
+    // Query books matching category and search filter
+    final books = await AppDatabase.instance.searchBooks(
+      query: _searchQuery,
+      category: _selectedCategory == 'All' ? null : _selectedCategory,
+    );
+
+    // Query distinct categories and in-progress books
+    final dbCategories = await AppDatabase.instance.getCategories();
+    final continueReading =
+        await AppDatabase.instance.getContinueReadingBooks();
+    final totalCount = await AppDatabase.instance.getBookCount();
+
+    if (!mounted) return;
+
+    // Merge standard categories with whatever exists in DB
+    final mergedCategories = {'All', ...dbCategories}.toList();
+
     setState(() {
-      _isLoading = true;
+      _books = books;
+      _continueReadingBooks = continueReading;
+      _categories = mergedCategories;
+      _totalBooksCount = totalCount;
+      _isLoading = false;
     });
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+  }
+
+  /// Open book reader and reload database progress upon returning
+  Future<void> _openReader(Book book) async {
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            BookReaderScreen(book: book),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOut,
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
+
+    // Refresh from SQLite to update current_page and bookmarks
+    if (mounted) {
+      _loadBooks();
+    }
+  }
+
+  /// Show dialog to add a new book (via local file or manual input)
+  void _showAddBookSheet() {
+    final theme = Theme.of(context);
+    final crimsonSeed = theme.colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Add Book to Library',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Import documents directly into SQLite storage',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Option 1: Pick local PDF/EPUB file
+            ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              tileColor: crimsonSeed.withValues(alpha: 0.06),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              leading: CircleAvatar(
+                backgroundColor: crimsonSeed.withValues(alpha: 0.15),
+                child: Icon(Icons.file_upload_outlined, color: crimsonSeed),
+              ),
+              title: const Text(
+                'Import PDF or EPUB File',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+              subtitle: const Text(
+                'Select a document stored on your device',
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickAndImportFile();
+              },
+            ),
+            const SizedBox(height: 12),
+            // Option 2: Add manually
+            ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              tileColor: Colors.grey[100],
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              leading: CircleAvatar(
+                backgroundColor: Colors.grey[200],
+                child:
+                    const Icon(Icons.edit_note_rounded, color: Colors.black87),
+              ),
+              title: const Text(
+                'Add Book Details Manually',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+              subtitle: const Text(
+                'Enter title, author, category, and cover image',
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showManualBookDialog();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pick a file from storage and insert into SQLite
+  Future<void> _pickAndImportFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'epub'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final path = file.path;
+        final rawName = file.name
+            .replaceAll(RegExp(r'\.(pdf|epub)$', caseSensitive: false), '')
+            .replaceAll('_', ' ');
+
+        final ext = (file.extension ?? 'pdf').toLowerCase();
+        final fileType = ext == 'epub' ? BookFileType.epub : BookFileType.pdf;
+
+        final newBook = Book(
+          name: rawName,
+          filePath: path,
+          fileType: fileType,
+          category: 'Imported',
+          author: 'Local File',
+          numberOfPages: 20,
+        );
+
+        final newId = await AppDatabase.instance.insertBook(newBook);
+        await _loadBooks();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"$rawName" added to SQLite database (#$newId)'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF1E1E2E),
+            ),
+          );
+        }
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to import file: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Dialog for manual book creation
+  void _showManualBookDialog() {
+    final titleCtrl = TextEditingController();
+    final authorCtrl = TextEditingController();
+    final categoryCtrl = TextEditingController(text: 'General');
+    final coverCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('New Book Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Book Title',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.book_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: authorCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Author',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: categoryCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: coverCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Cover Image URL (optional)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.image_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (titleCtrl.text.trim().isEmpty) return;
+              Navigator.of(ctx).pop();
+
+              final book = Book(
+                name: titleCtrl.text.trim(),
+                author: authorCtrl.text.trim().isEmpty
+                    ? 'Unknown Author'
+                    : authorCtrl.text.trim(),
+                category: categoryCtrl.text.trim().isEmpty
+                    ? 'General'
+                    : categoryCtrl.text.trim(),
+                coverUrl: coverCtrl.text.trim().isNotEmpty
+                    ? coverCtrl.text.trim()
+                    : null,
+                numberOfPages: 20,
+              );
+
+              final newId = await AppDatabase.instance.insertBook(book);
+              await _loadBooks();
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        '"${book.name}" stored in SQLite successfully (#$newId)'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: const Text('Save to DB'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Delete book from SQLite
+  Future<void> _deleteBook(Book book) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Book'),
+        content: Text(
+          'Are you sure you want to remove "${book.title}" and its bookmarks from your SQLite database?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red[700]),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && book.id != null) {
+      await AppDatabase.instance.deleteBook(book.id!);
+      await _loadBooks();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${book.title}" removed from database'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final crimsonSeed = theme.colorScheme.primary;
-
-    // Filter books based on category
-    final filteredBooks = _selectedCategory == 'All'
-        ? sampleBooks
-        : sampleBooks.where((b) => b.category == _selectedCategory).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FB),
@@ -120,15 +407,15 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good afternoon,',
+              'SQLite Powered Library',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Colors.grey[600],
-                fontWeight: FontWeight.w400,
+                fontWeight: FontWeight.w500,
               ),
             ),
             const Text(
-              'Elegant Reader',
+              'Bookshelf',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -138,45 +425,51 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         actions: [
-          // Loading State Toggle Button
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton.filledTonal(
-              onPressed: _simulateLoading,
-              style: IconButton.styleFrom(
-                backgroundColor: crimsonSeed.withOpacity(0.08),
-                foregroundColor: crimsonSeed,
-              ),
-              icon: Icon(
-                _isLoading
-                    ? Icons.hourglass_top_rounded
-                    : Icons.refresh_rounded,
-              ),
-              tooltip: 'Toggle Skeleton Skeletons',
+          // Refresh / Reload from SQLite
+          IconButton.filledTonal(
+            onPressed: _loadBooks,
+            style: IconButton.styleFrom(
+              backgroundColor: crimsonSeed.withValues(alpha: 0.08),
+              foregroundColor: crimsonSeed,
             ),
+            icon: Icon(
+              _isLoading ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
+            ),
+            tooltip: 'Reload SQLite Data',
           ),
-          // Profile Avatar
+          const SizedBox(width: 8),
+          // User avatar
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: CircleAvatar(
               radius: 18,
-              backgroundColor: crimsonSeed.withOpacity(0.15),
+              backgroundColor: crimsonSeed.withValues(alpha: 0.15),
               child: Text(
-                'R',
+                '$_totalBooksCount',
                 style: TextStyle(
                   color: crimsonSeed,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
             ),
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddBookSheet,
+        backgroundColor: crimsonSeed,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Add Book',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // Gorgeous Welcome Banner
+          // Welcome Banner
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.all(16.0),
@@ -185,7 +478,11 @@ class _HomePageState extends State<HomePage> {
                 gradient: LinearGradient(
                   colors: [
                     crimsonSeed,
-                    crimsonSeed.withRed((crimsonSeed.red + 40).clamp(0, 255)),
+                    crimsonSeed.withValues(
+                      red:
+                          ((crimsonSeed.r * 255.0).round() + 40).clamp(0, 255) /
+                              255.0,
+                    ),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -193,7 +490,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: crimsonSeed.withOpacity(0.3),
+                    color: crimsonSeed.withValues(alpha: 0.3),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   ),
@@ -206,7 +503,7 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Icon(
-                        Icons.local_library_rounded,
+                        Icons.storage_rounded,
                         color: Colors.white70,
                         size: 28,
                       ),
@@ -219,20 +516,20 @@ class _HomePageState extends State<HomePage> {
                           color: Colors.white24,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text(
-                          'Library Card Active',
-                          style: TextStyle(
+                        child: Text(
+                          '$_totalBooksCount Books Stored',
+                          style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   const Text(
-                    'Explore your virtual library',
+                    'Explore your SQLite Library',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -241,7 +538,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Uncover secrets, learn theories, and expand your consciousness with premium books.',
+                    'Structured data keeping with real-time reading progress and bookmarks persistence.',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 13,
@@ -253,23 +550,108 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // Categories Selector
+          // Search Bar for structured retrieval
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val);
+                    _loadBooks();
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search by title, author, or genre...',
+                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                    prefixIcon:
+                        Icon(Icons.search_rounded, color: Colors.grey[500]),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                              _loadBooks();
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Continue Reading Shelf (if user has books in progress)
+          if (_continueReadingBooks.isNotEmpty && _searchQuery.isEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_stories_rounded,
+                        color: crimsonSeed, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Continue Reading',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 136,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _continueReadingBooks.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final book = _continueReadingBooks[index];
+                    return _ContinueReadingCard(
+                      book: book,
+                      onTap: () => _openReader(book),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+
+          // Categories Horizontal Selector
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
-                  children: [
-                    'All',
-                    'Philosophy',
-                    'Design',
-                    'Classics',
-                    'Sci-Fi',
-                    'Mystery'
-                  ].map((cat) {
+                  children: _categories.map((cat) {
                     final isSelected = _selectedCategory == cat;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8.0),
@@ -278,9 +660,8 @@ class _HomePageState extends State<HomePage> {
                         selected: isSelected,
                         onSelected: (selected) {
                           if (selected) {
-                            setState(() {
-                              _selectedCategory = cat;
-                            });
+                            setState(() => _selectedCategory = cat);
+                            _loadBooks();
                           }
                         },
                         selectedColor: crimsonSeed,
@@ -299,7 +680,7 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: isSelected ? 4 : 0,
-                        shadowColor: crimsonSeed.withOpacity(0.4),
+                        shadowColor: crimsonSeed.withValues(alpha: 0.4),
                       ),
                     );
                   }).toList(),
@@ -311,29 +692,33 @@ class _HomePageState extends State<HomePage> {
           // Grid Section Header
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _isLoading ? 'Discovering Gems...' : 'Recommended for You',
+                    _isLoading
+                        ? 'Loading Library...'
+                        : _searchQuery.isNotEmpty
+                            ? 'Search Results (${_books.length})'
+                            : _selectedCategory == 'All'
+                                ? 'All Books (${_books.length})'
+                                : '$_selectedCategory (${_books.length})',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.2,
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _isLoading = !_isLoading;
-                      });
-                    },
-                    child: Text(
-                      _isLoading ? 'Skip Loading' : 'Show Skeleton',
-                      style: TextStyle(color: crimsonSeed),
+                  if (_searchQuery.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                        _loadBooks();
+                      },
+                      child: const Text('Clear Search'),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -344,12 +729,117 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             sliver: _isLoading
                 ? const BookGridSkeleton()
-                : BookGrid(books: filteredBooks),
+                : BookGrid(
+                    books: _books,
+                    onOpen: _openReader,
+                    onDelete: _deleteBook,
+                  ),
           ),
 
-          // Space bottom
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          // Space bottom for FAB
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
+      ),
+    );
+  }
+}
+
+/// Continue Reading Horizontal Card
+class _ContinueReadingCard extends StatelessWidget {
+  final Book book;
+  final VoidCallback onTap;
+
+  const _ContinueReadingCard({
+    required this.book,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final crimsonSeed = theme.colorScheme.primary;
+    final progress = book.progressPercentage;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 280,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Mini Cover
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 60,
+                height: 90,
+                child: _buildCoverImage(book, crimsonSeed),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    book.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    book.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Progress Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress > 0 ? progress : 0.05,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(crimsonSeed),
+                      minHeight: 5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    book.numberOfPages > 0
+                        ? 'Page ${book.currentPage + 1} of ${book.numberOfPages}'
+                        : 'Page ${book.currentPage + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[500],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -358,8 +848,15 @@ class _HomePageState extends State<HomePage> {
 /// 2 x N Grid for displaying loaded books
 class BookGrid extends StatelessWidget {
   final List<Book> books;
+  final void Function(Book) onOpen;
+  final void Function(Book) onDelete;
 
-  const BookGrid({super.key, required this.books});
+  const BookGrid({
+    super.key,
+    required this.books,
+    required this.onOpen,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -373,8 +870,17 @@ class BookGrid extends StatelessWidget {
                   size: 64, color: Colors.grey[300]),
               const SizedBox(height: 12),
               Text(
-                'No books in this category',
-                style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                'No books found',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Try adjusting your search or add a new book to SQLite.',
+                style: TextStyle(color: Colors.grey[400], fontSize: 13),
               ),
             ],
           ),
@@ -387,12 +893,16 @@ class BookGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 16.0,
         crossAxisSpacing: 16.0,
-        childAspectRatio: 0.62, // Elegant proportion for book covers + texts
+        childAspectRatio: 0.60,
       ),
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           final book = books[index];
-          return BookCard(book: book);
+          return BookCard(
+            book: book,
+            onTap: () => onOpen(book),
+            onDelete: () => onDelete(book),
+          );
         },
         childCount: books.length,
       ),
@@ -403,8 +913,15 @@ class BookGrid extends StatelessWidget {
 /// Premium Card showcasing individual book cover, category tag, rating, and info
 class BookCard extends StatefulWidget {
   final Book book;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
 
-  const BookCard({super.key, required this.book});
+  const BookCard({
+    super.key,
+    required this.book,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   @override
   State<BookCard> createState() => _BookCardState();
@@ -445,18 +962,8 @@ class _BookCardState extends State<BookCard>
         onTapDown: (_) => _hoverController.forward(),
         onTapUp: (_) => _hoverController.reverse(),
         onTapCancel: () => _hoverController.reverse(),
-        onTap: () {
-          // Provide interactive feedback
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Opening details for "${widget.book.title}"...'),
-              duration: const Duration(seconds: 1),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: crimsonSeed,
-            ),
-          );
-        },
+        onTap: widget.onTap,
+        onLongPress: widget.onDelete,
         child: ScaleTransition(
           scale: _scaleAnimation,
           child: Column(
@@ -469,7 +976,7 @@ class _BookCardState extends State<BookCard>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -480,45 +987,17 @@ class _BookCardState extends State<BookCard>
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // High-quality image with fade transition
-                        Image.network(
-                          widget.book.coverUrl,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const ShimmerPlaceholder();
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            // Fallback elegant gradient if image fails to load
-                            return Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    crimsonSeed.withOpacity(0.4),
-                                    crimsonSeed.withOpacity(0.7),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.book_rounded,
-                                  color: Colors.white,
-                                  size: 40,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        // Dark overlay gradient at the bottom for readability if needed
+                        // Safe Cover image loader
+                        _buildCoverImage(widget.book, crimsonSeed),
+
+                        // Dark gradient overlay
                         Positioned.fill(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
                                   Colors.transparent,
-                                  Colors.black.withOpacity(0.1),
+                                  Colors.black.withValues(alpha: 0.15),
                                 ],
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -526,29 +1005,53 @@ class _BookCardState extends State<BookCard>
                             ),
                           ),
                         ),
+
                         // Category Tag
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              widget.book.category.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                        if (widget.book.category.isNotEmpty)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                widget.book.category.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
                           ),
+
+                        // Options / Delete Button
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.more_vert_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.black38,
+                              padding: const EdgeInsets.all(4),
+                              minimumSize: const Size(28, 28),
+                            ),
+                            onPressed: () {
+                              _showBookContextMenu(context);
+                            },
+                          ),
                         ),
-                        // Rating Chip
+
+                        // Rating or Progress Chip
                         Positioned(
                           bottom: 8,
                           right: 8,
@@ -556,11 +1059,11 @@ class _BookCardState extends State<BookCard>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.92),
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withValues(alpha: 0.1),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
@@ -576,7 +1079,9 @@ class _BookCardState extends State<BookCard>
                                 ),
                                 const SizedBox(width: 2),
                                 Text(
-                                  widget.book.rating.toString(),
+                                  widget.book.rating > 0
+                                      ? widget.book.rating.toString()
+                                      : '4.8',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 10,
@@ -587,6 +1092,21 @@ class _BookCardState extends State<BookCard>
                             ),
                           ),
                         ),
+
+                        // Reading Progress bar on bottom of card
+                        if (widget.book.currentPage > 0)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: LinearProgressIndicator(
+                              value: widget.book.progressPercentage,
+                              backgroundColor: Colors.black26,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(crimsonSeed),
+                              minHeight: 3.5,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -623,6 +1143,93 @@ class _BookCardState extends State<BookCard>
       ),
     );
   }
+
+  void _showBookContextMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.auto_stories_rounded),
+              title: const Text('Read Now'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                widget.onTap();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded,
+                  color: Colors.redAccent),
+              title: const Text('Delete from Database',
+                  style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                widget.onDelete();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Safe cover image renderer that supports network URLs and gradient fallbacks
+Widget _buildCoverImage(Book book, Color primaryColor) {
+  final url = book.coverUrl;
+  if (url != null && url.trim().isNotEmpty && url.startsWith('http')) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const ShimmerPlaceholder();
+      },
+      errorBuilder: (context, error, stackTrace) =>
+          _buildCoverFallback(book, primaryColor),
+    );
+  }
+  return _buildCoverFallback(book, primaryColor);
+}
+
+Widget _buildCoverFallback(Book book, Color primaryColor) {
+  return Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          primaryColor.withValues(alpha: 0.7),
+          primaryColor.withValues(alpha: 0.95),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.book_rounded, color: Colors.white, size: 36),
+        const SizedBox(height: 8),
+        Text(
+          book.title,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// 2 x N Skeleton Grid representation
@@ -636,19 +1243,19 @@ class BookGridSkeleton extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 16.0,
         crossAxisSpacing: 16.0,
-        childAspectRatio: 0.62,
+        childAspectRatio: 0.60,
       ),
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           return const BookCardSkeleton();
         },
-        childCount: 6, // Show 6 skeleton cards by default
+        childCount: 6,
       ),
     );
   }
 }
 
-/// A premium look shimmer card placeholder for book cover, title, and author
+/// Shimmer card placeholder for book cover, title, and author
 class BookCardSkeleton extends StatelessWidget {
   const BookCardSkeleton({super.key});
 
@@ -657,20 +1264,17 @@ class BookCardSkeleton extends StatelessWidget {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Cover Art Skeleton
         Expanded(
           child: ShimmerPlaceholder(
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
         SizedBox(height: 10),
-        // Title Skeleton
         ShimmerPlaceholder(
           height: 14,
           width: 110,
         ),
         SizedBox(height: 6),
-        // Author Skeleton
         ShimmerPlaceholder(
           height: 11,
           width: 70,
@@ -680,7 +1284,7 @@ class BookCardSkeleton extends StatelessWidget {
   }
 }
 
-/// Custom Zero-Dependency Shimmer effect that works flawlessly across themes
+/// Zero-Dependency Shimmer effect that works flawlessly across themes
 class ShimmerPlaceholder extends StatefulWidget {
   final double? width;
   final double? height;
@@ -719,7 +1323,6 @@ class _ShimmerPlaceholderState extends State<ShimmerPlaceholder>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Premium soft colors for the shimmer sweep
     final baseColor = isDark ? Colors.grey[800]! : const Color(0xFFEBEBF0);
     final highlightColor = isDark ? Colors.grey[700]! : const Color(0xFFF5F5FA);
 
