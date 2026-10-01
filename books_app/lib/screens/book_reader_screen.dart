@@ -285,7 +285,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (bm.id != null) {
       await AppDatabase.instance.deleteBookmark(bm.id!);
     }
-    setState(() => _bookmarks = _bookmarks.where((b) => b.page != page).toList());
+    setState(
+        () => _bookmarks = _bookmarks.where((b) => b.page != page).toList());
   }
 
   void _showBookmarkAddedSnack(BookmarkColor color) {
@@ -443,7 +444,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.menu_book_rounded,
-              size: 72, color: fgColor.withOpacity(0.3)),
+              size: 72, color: fgColor.withValues(alpha: 0.3)),
           const SizedBox(height: 16),
           Text('Opening EPUB…', style: TextStyle(color: fgColor, fontSize: 16)),
         ],
@@ -478,8 +479,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               fontSize: _fontSize,
               fgColor: fgColor,
               bgColor: _theme.background,
-              bookmark:
-                  _bookmarks.where((b) => b.page == index).firstOrNull,
+              bookmark: _bookmarks.where((b) => b.page == index).firstOrNull,
             ),
           ),
         ),
@@ -504,7 +504,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               color: appBarColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 )
@@ -542,7 +542,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                               Text(
                                 _book.author,
                                 style: TextStyle(
-                                  color: fgColor.withOpacity(0.5),
+                                  color: fgColor.withValues(alpha: 0.5),
                                   fontSize: 11.5,
                                 ),
                                 maxLines: 1,
@@ -583,7 +583,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                   // Progress bar
                   LinearProgressIndicator(
                     value: progress.clamp(0.0, 1.0),
-                    backgroundColor: fgColor.withOpacity(0.08),
+                    backgroundColor: fgColor.withValues(alpha: 0.08),
                     valueColor:
                         const AlwaysStoppedAnimation<Color>(Color(0xFFE53935)),
                     minHeight: 2,
@@ -612,7 +612,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               color: appBarColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 )
@@ -631,7 +631,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                         Text(
                           'Pg ${_currentPage + 1}',
                           style: TextStyle(
-                            color: fgColor.withOpacity(0.55),
+                            color: fgColor.withValues(alpha: 0.55),
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -645,10 +645,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                               overlayShape: const RoundSliderOverlayShape(
                                   overlayRadius: 16),
                               activeTrackColor: const Color(0xFFE53935),
-                              inactiveTrackColor: fgColor.withOpacity(0.12),
+                              inactiveTrackColor:
+                                  fgColor.withValues(alpha: 0.12),
                               thumbColor: const Color(0xFFE53935),
-                              overlayColor:
-                                  const Color(0xFFE53935).withOpacity(0.15),
+                              overlayColor: const Color(0xFFE53935)
+                                  .withValues(alpha: 0.15),
                             ),
                             child: Slider(
                               value: _currentPage.toDouble(),
@@ -661,7 +662,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                         Text(
                           'Pg $_totalPages',
                           style: TextStyle(
-                            color: fgColor.withOpacity(0.55),
+                            color: fgColor.withValues(alpha: 0.55),
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -720,7 +721,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         children: [
           GestureDetector(
             onTap: _toggleToc,
-            child: Container(color: Colors.black.withOpacity(0.4)),
+            child: Container(color: Colors.black.withValues(alpha: 0.4)),
           ),
           Positioned(
             top: 0,
@@ -755,13 +756,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                             ),
                             IconButton(
                               icon: Icon(Icons.close_rounded,
-                                  color: fgColor.withOpacity(0.4)),
+                                  color: fgColor.withValues(alpha: 0.4)),
                               onPressed: _toggleToc,
                             ),
                           ],
                         ),
                       ),
-                      Divider(height: 1, color: fgColor.withOpacity(0.08)),
+                      Divider(
+                          height: 1, color: fgColor.withValues(alpha: 0.08)),
                       Expanded(
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -831,13 +833,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                         ),
                         IconButton(
                           icon: Icon(Icons.close_rounded,
-                              color: fgColor.withOpacity(0.4)),
+                              color: fgColor.withValues(alpha: 0.4)),
                           onPressed: _toggleBookmarkPanel,
                         ),
                       ],
                     ),
                   ),
-                  Divider(height: 1, color: fgColor.withOpacity(0.08)),
+                  Divider(height: 1, color: fgColor.withValues(alpha: 0.08)),
                   if (_bookmarks.isEmpty)
                     Expanded(
                       child: Center(
@@ -845,12 +847,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.bookmark_border_rounded,
-                                size: 52, color: fgColor.withOpacity(0.15)),
+                                size: 52,
+                                color: fgColor.withValues(alpha: 0.15)),
                             const SizedBox(height: 12),
                             Text(
                               'No bookmarks yet',
                               style: TextStyle(
-                                  color: fgColor.withOpacity(0.35),
+                                  color: fgColor.withValues(alpha: 0.35),
                                   fontSize: 15),
                             ),
                           ],
@@ -864,7 +867,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                             horizontal: 16, vertical: 8),
                         itemCount: _bookmarks.length,
                         separatorBuilder: (_, __) => Divider(
-                            height: 1, color: fgColor.withOpacity(0.06)),
+                            height: 1, color: fgColor.withValues(alpha: 0.06)),
                         itemBuilder: (_, i) {
                           final bm = _bookmarks[i];
                           return _BookmarkItem(
@@ -921,7 +924,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: _theme.foreground.withOpacity(0.15),
+                      color: _theme.foreground.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -939,7 +942,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 Text(
                   'Colour',
                   style: TextStyle(
-                    color: _theme.foreground.withOpacity(0.5),
+                    color: _theme.foreground.withValues(alpha: 0.5),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.5,
@@ -961,13 +964,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                           shape: BoxShape.circle,
                           border: sel
                               ? Border.all(
-                                  color: _theme.foreground.withOpacity(0.6),
+                                  color:
+                                      _theme.foreground.withValues(alpha: 0.6),
                                   width: 2.5)
                               : null,
                           boxShadow: sel
                               ? [
                                   BoxShadow(
-                                    color: Color(c.argb).withOpacity(0.55),
+                                    color:
+                                        Color(c.argb).withValues(alpha: 0.55),
                                     blurRadius: 10,
                                   )
                                 ]
@@ -987,10 +992,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                   style: TextStyle(color: _theme.foreground),
                   decoration: InputDecoration(
                     hintText: 'Add a note (optional)',
-                    hintStyle:
-                        TextStyle(color: _theme.foreground.withOpacity(0.35)),
+                    hintStyle: TextStyle(
+                        color: _theme.foreground.withValues(alpha: 0.35)),
                     filled: true,
-                    fillColor: _theme.foreground.withOpacity(0.05),
+                    fillColor: _theme.foreground.withValues(alpha: 0.05),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -1050,7 +1055,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: _theme.foreground.withOpacity(0.15),
+                    color: _theme.foreground.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1066,14 +1071,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 children: [
                   Text('A',
                       style: TextStyle(
-                          color: _theme.foreground.withOpacity(0.5),
+                          color: _theme.foreground.withValues(alpha: 0.5),
                           fontSize: 13)),
                   Expanded(
                     child: SliderTheme(
                       data: SliderThemeData(
                         activeTrackColor: const Color(0xFFE53935),
                         thumbColor: const Color(0xFFE53935),
-                        inactiveTrackColor: _theme.foreground.withOpacity(0.12),
+                        inactiveTrackColor:
+                            _theme.foreground.withValues(alpha: 0.12),
                       ),
                       child: Slider(
                         value: _fontSize,
@@ -1090,7 +1096,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                   ),
                   Text('A',
                       style: TextStyle(
-                          color: _theme.foreground.withOpacity(0.5),
+                          color: _theme.foreground.withValues(alpha: 0.5),
                           fontSize: 22,
                           fontWeight: FontWeight.bold)),
                 ],
@@ -1099,7 +1105,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _theme.foreground.withOpacity(0.05),
+                  color: _theme.foreground.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -1138,7 +1144,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: _theme.foreground.withOpacity(0.15),
+                  color: _theme.foreground.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1170,13 +1176,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                       border: Border.all(
                         color: sel
                             ? const Color(0xFFE53935)
-                            : Colors.grey.withOpacity(0.2),
+                            : Colors.grey.withValues(alpha: 0.2),
                         width: sel ? 2 : 1,
                       ),
                       boxShadow: sel
                           ? [
                               BoxShadow(
-                                color: const Color(0xFFE53935).withOpacity(0.2),
+                                color: const Color(0xFFE53935)
+                                    .withValues(alpha: 0.2),
                                 blurRadius: 10,
                               )
                             ]
@@ -1272,7 +1279,7 @@ class _DemoPage extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [
                       Color(bookmark!.color.argb),
-                      Color(bookmark!.color.argb).withOpacity(0.3),
+                      Color(bookmark!.color.argb).withValues(alpha: 0.3),
                     ],
                   ),
                 ),
@@ -1312,7 +1319,7 @@ class _DemoPage extends StatelessWidget {
                   child: Text(
                     '— ${pageIndex + 1} —',
                     style: TextStyle(
-                      color: fgColor.withOpacity(0.25),
+                      color: fgColor.withValues(alpha: 0.25),
                       fontSize: 13,
                       letterSpacing: 2,
                     ),
@@ -1330,11 +1337,11 @@ class _DemoPage extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Color(bookmark!.color.argb).withOpacity(0.85),
+                  color: Color(bookmark!.color.argb).withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(bookmark!.color.argb).withOpacity(0.3),
+                      color: Color(bookmark!.color.argb).withValues(alpha: 0.3),
                       blurRadius: 8,
                     )
                   ],
@@ -1403,7 +1410,7 @@ class _TocItem extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFFE53935).withOpacity(0.08)
+              ? const Color(0xFFE53935).withValues(alpha: 0.08)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
@@ -1425,7 +1432,7 @@ class _TocItem extends StatelessWidget {
                 style: TextStyle(
                   color: isActive
                       ? const Color(0xFFE53935)
-                      : fgColor.withOpacity(0.72),
+                      : fgColor.withValues(alpha: 0.72),
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                   fontSize: 14.5,
                 ),
@@ -1433,7 +1440,8 @@ class _TocItem extends StatelessWidget {
             ),
             Text(
               '${entry.page}',
-              style: TextStyle(color: fgColor.withOpacity(0.3), fontSize: 12),
+              style: TextStyle(
+                  color: fgColor.withValues(alpha: 0.3), fontSize: 12),
             ),
           ],
         ),
@@ -1473,7 +1481,7 @@ class _BookmarkItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Color(bookmark.color.argb).withOpacity(0.4),
+                    color: Color(bookmark.color.argb).withValues(alpha: 0.4),
                     blurRadius: 6,
                   )
                 ],
@@ -1497,7 +1505,7 @@ class _BookmarkItem extends StatelessWidget {
                     Text(
                       bookmark.note!,
                       style: TextStyle(
-                          color: fgColor.withOpacity(0.5), fontSize: 12),
+                          color: fgColor.withValues(alpha: 0.5), fontSize: 12),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1506,7 +1514,7 @@ class _BookmarkItem extends StatelessWidget {
                   Text(
                     '${bookmark.createdAt.day}/${bookmark.createdAt.month}/${bookmark.createdAt.year}',
                     style: TextStyle(
-                        color: fgColor.withOpacity(0.28), fontSize: 11),
+                        color: fgColor.withValues(alpha: 0.28), fontSize: 11),
                   ),
                 ],
               ),
@@ -1514,7 +1522,7 @@ class _BookmarkItem extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Color(bookmark.color.argb).withOpacity(0.22),
+                color: Color(bookmark.color.argb).withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -1529,7 +1537,7 @@ class _BookmarkItem extends StatelessWidget {
             const SizedBox(width: 4),
             IconButton(
               icon: Icon(Icons.delete_outline_rounded,
-                  size: 18, color: fgColor.withOpacity(0.28)),
+                  size: 18, color: fgColor.withValues(alpha: 0.28)),
               onPressed: onDelete,
               splashRadius: 18,
               padding: EdgeInsets.zero,
