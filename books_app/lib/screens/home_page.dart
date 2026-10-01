@@ -149,11 +149,11 @@ class _HomePageState extends State<HomePage> {
             ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              tileColor: crimsonSeed.withOpacity(0.06),
+              tileColor: crimsonSeed.withValues(alpha: 0.06),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
               leading: CircleAvatar(
-                backgroundColor: crimsonSeed.withOpacity(0.15),
+                backgroundColor: crimsonSeed.withValues(alpha: 0.15),
                 child: Icon(Icons.file_upload_outlined, color: crimsonSeed),
               ),
               title: const Text(
@@ -180,7 +180,8 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(16)),
               leading: CircleAvatar(
                 backgroundColor: Colors.grey[200],
-                child: const Icon(Icons.edit_note_rounded, color: Colors.black87),
+                child:
+                    const Icon(Icons.edit_note_rounded, color: Colors.black87),
               ),
               title: const Text(
                 'Add Book Details Manually',
@@ -218,8 +219,7 @@ class _HomePageState extends State<HomePage> {
             .replaceAll('_', ' ');
 
         final ext = (file.extension ?? 'pdf').toLowerCase();
-        final fileType =
-            ext == 'epub' ? BookFileType.epub : BookFileType.pdf;
+        final fileType = ext == 'epub' ? BookFileType.epub : BookFileType.pdf;
 
         final newBook = Book(
           name: rawName,
@@ -429,13 +429,11 @@ class _HomePageState extends State<HomePage> {
           IconButton.filledTonal(
             onPressed: _loadBooks,
             style: IconButton.styleFrom(
-              backgroundColor: crimsonSeed.withOpacity(0.08),
+              backgroundColor: crimsonSeed.withValues(alpha: 0.08),
               foregroundColor: crimsonSeed,
             ),
             icon: Icon(
-              _isLoading
-                  ? Icons.hourglass_top_rounded
-                  : Icons.refresh_rounded,
+              _isLoading ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
             ),
             tooltip: 'Reload SQLite Data',
           ),
@@ -445,7 +443,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.only(right: 16.0),
             child: CircleAvatar(
               radius: 18,
-              backgroundColor: crimsonSeed.withOpacity(0.15),
+              backgroundColor: crimsonSeed.withValues(alpha: 0.15),
               child: Text(
                 '$_totalBooksCount',
                 style: TextStyle(
@@ -480,7 +478,11 @@ class _HomePageState extends State<HomePage> {
                 gradient: LinearGradient(
                   colors: [
                     crimsonSeed,
-                    crimsonSeed.withRed((crimsonSeed.red + 40).clamp(0, 255)),
+                    crimsonSeed.withValues(
+                      red:
+                          ((crimsonSeed.r * 255.0).round() + 40).clamp(0, 255) /
+                              255.0,
+                    ),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -488,7 +490,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: crimsonSeed.withOpacity(0.3),
+                    color: crimsonSeed.withValues(alpha: 0.3),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   ),
@@ -551,14 +553,15 @@ class _HomePageState extends State<HomePage> {
           // Search Bar for structured retrieval
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -677,7 +680,7 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: isSelected ? 4 : 0,
-                        shadowColor: crimsonSeed.withOpacity(0.4),
+                        shadowColor: crimsonSeed.withValues(alpha: 0.4),
                       ),
                     );
                   }).toList(),
@@ -767,7 +770,7 @@ class _ContinueReadingCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -973,7 +976,7 @@ class _BookCardState extends State<BookCard>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -994,7 +997,7 @@ class _BookCardState extends State<BookCard>
                               gradient: LinearGradient(
                                 colors: [
                                   Colors.transparent,
-                                  Colors.black.withOpacity(0.15),
+                                  Colors.black.withValues(alpha: 0.15),
                                 ],
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -1012,7 +1015,7 @@ class _BookCardState extends State<BookCard>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.65),
+                                color: Colors.black.withValues(alpha: 0.65),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -1056,11 +1059,11 @@ class _BookCardState extends State<BookCard>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.92),
+                              color: Colors.white.withValues(alpha: 0.92),
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withValues(alpha: 0.1),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
@@ -1099,8 +1102,8 @@ class _BookCardState extends State<BookCard>
                             child: LinearProgressIndicator(
                               value: widget.book.progressPercentage,
                               backgroundColor: Colors.black26,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  crimsonSeed),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(crimsonSeed),
                               minHeight: 3.5,
                             ),
                           ),
@@ -1201,8 +1204,8 @@ Widget _buildCoverFallback(Book book, Color primaryColor) {
     decoration: BoxDecoration(
       gradient: LinearGradient(
         colors: [
-          primaryColor.withOpacity(0.7),
-          primaryColor.withOpacity(0.95),
+          primaryColor.withValues(alpha: 0.7),
+          primaryColor.withValues(alpha: 0.95),
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -1321,8 +1324,7 @@ class _ShimmerPlaceholderState extends State<ShimmerPlaceholder>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDark ? Colors.grey[800]! : const Color(0xFFEBEBF0);
-    final highlightColor =
-        isDark ? Colors.grey[700]! : const Color(0xFFF5F5FA);
+    final highlightColor = isDark ? Colors.grey[700]! : const Color(0xFFF5F5FA);
 
     return AnimatedBuilder(
       animation: _controller,

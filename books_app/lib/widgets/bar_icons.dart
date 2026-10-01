@@ -7,6 +7,7 @@ class BarIconButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const BarIconButton({
+    super.key,
     required this.icon,
     required this.color,
     required this.tooltip,
@@ -33,6 +34,7 @@ class BottomControlItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const BottomControlItem({
+    super.key,
     required this.icon,
     required this.label,
     required this.color,
@@ -46,12 +48,12 @@ class BottomControlItem extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color.withOpacity(0.7), size: 22),
+          Icon(icon, color: color.withValues(alpha: 0.7), size: 22),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: color.withOpacity(0.55),
+              color: color.withValues(alpha: 0.55),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
