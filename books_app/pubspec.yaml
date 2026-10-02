@@ -39,7 +39,8 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^27.1.53
 
   # EPUB viewer
-  vocsy_epub_viewer: 3.0.0
+  vocsy_epub_viewer:
+    path: packages/vocsy_epub_viewer
 
   # File picker — lets users open local PDF/EPUB files
   file_picker: ^8.0.0+1
