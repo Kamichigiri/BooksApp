@@ -15,6 +15,9 @@ class VocsyEpub {
   static const MethodChannel _channel =
       const MethodChannel('vocsy_epub_viewer');
   static const EventChannel _pageChannel = const EventChannel('page');
+  // Locally patched to share a single EventChannel subscription across readers.
+  static final Stream<dynamic> _locatorBroadcastStream =
+      _pageChannel.receiveBroadcastStream();
 
   /// Configure Viewer's with available values
   ///
@@ -54,37 +57,32 @@ class VocsyEpub {
     await _channel.invokeMethod<void>('open', agrs);
   }
 
-  static void closeReader() async {
-    _channel.invokeMethod('setChannel');
-    await _channel.invokeMethod('close');
+  static Future<void> closeReader() async {
+    await setChannel();
+    await _channel.invokeMethod<void>('close');
   }
 
   /// bookPath should be an asset file path.
   /// Last location is only available for android.
-  static Future openAsset(String bookPath, {EpubLocator? lastLocation}) async {
+  static Future<void> openAsset(String bookPath,
+      {EpubLocator? lastLocation}) async {
     if (extension(bookPath) == '.epub') {
       Map<String, dynamic> agrs = {
         "bookPath": (await Util.getFileFromAsset(bookPath)).path,
         'lastLocation':
             lastLocation == null ? '' : jsonEncode(lastLocation.toJson()),
       };
-      _channel.invokeMethod('setChannel');
-      await _channel.invokeMethod('open', agrs);
+      await setChannel();
+      await _channel.invokeMethod<void>('open', agrs);
     } else {
       throw ('${extension(bookPath)} cannot be opened, use an EPUB File');
     }
   }
 
-  static Future setChannel() async {
-    await _channel.invokeMethod('setChannel');
+  static Future<void> setChannel() async {
+    await _channel.invokeMethod<void>('setChannel');
   }
 
   /// Stream to get EpubLocator for android and pageNumber for iOS
-  static Stream get locatorStream {
-    print("In stream");
-    Stream pageStream =
-        _pageChannel.receiveBroadcastStream().map((value) => value);
-
-    return pageStream;
-  }
+  static Stream<dynamic> get locatorStream => _locatorBroadcastStream;
 }

@@ -2,6 +2,8 @@ package com.vocsy.epub_viewer;
 
 import android.app.Activity;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import java.util.Map;
@@ -19,10 +21,9 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin;
 
 import androidx.annotation.NonNull;
 
-import com.folioreader.model.locators.ReadLocator;
 
 /**
- * EpubReaderPlugin
+ * EpubReaderPlugin. Locally patched for lifecycle and method-result handling.
  */
 public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, ActivityAware {
 
@@ -44,32 +45,8 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
         context = registrar.context();
         activity = registrar.activity();
         messenger = registrar.messenger();
-        new EventChannel(messenger, "page").setStreamHandler(new EventChannel.StreamHandler() {
-
-            /**
-             * Stores the event sink used to send reading positions to Flutter.
-             */
-            @Override
-            public void onListen(Object o, EventChannel.EventSink eventSink) {
-
-                sink = eventSink;
-                if (sink == null) {
-                    Log.i("empty", "Sink is empty");
-                }
-            }
-
-            /**
-             * Leaves the stored event sink unchanged when the stream is cancelled.
-             */
-            @Override
-            public void onCancel(Object o) {
-
-            }
-        });
-
-
-        final MethodChannel channel = new MethodChannel(registrar.messenger(), "vocsy_epub_viewer");
-        channel.setMethodCallHandler(new EpubViewerPlugin());
+        EpubViewerPlugin plugin = new EpubViewerPlugin();
+        plugin.registerChannels(messenger, new MethodChannel(messenger, channelName));
 
     }
 
@@ -80,38 +57,47 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
         messenger = binding.getBinaryMessenger();
         context = binding.getApplicationContext();
-        new EventChannel(messenger, "page").setStreamHandler(new EventChannel.StreamHandler() {
+        channel = new MethodChannel(binding.getBinaryMessenger(), channelName);
+        registerChannels(messenger, channel);
+    }
 
-            /**
-             * Stores the event sink used to send reading positions to Flutter.
-             */
+    /**
+     * Registers the method and page-event channels.
+     */
+    private void registerChannels(BinaryMessenger binaryMessenger, MethodChannel methodChannel) {
+        eventChannel = new EventChannel(binaryMessenger, "page");
+        eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
             @Override
-            public void onListen(Object o, EventChannel.EventSink eventSink) {
-
+            public void onListen(Object arguments, EventChannel.EventSink eventSink) {
                 sink = eventSink;
-                if (sink == null) {
-                    Log.i("empty", "Sink is empty");
-                }
             }
 
-            /**
-             * Leaves the stored event sink unchanged when the stream is cancelled.
-             */
             @Override
-            public void onCancel(Object o) {
-
+            public void onCancel(Object arguments) {
+                sink = null;
             }
         });
-        channel = new MethodChannel(binding.getFlutterEngine().getDartExecutor(), channelName);
+        channel = methodChannel;
         channel.setMethodCallHandler(this);
     }
 
     /**
-     * Handles engine detachment without releasing the stored channel references.
+     * Releases channel references when detached from the Flutter engine.
      */
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-        // TODO: your plugin is no longer attached to a Flutter experience.
+        if (channel != null) {
+            channel.setMethodCallHandler(null);
+            channel = null;
+        }
+        if (eventChannel != null) {
+            eventChannel.setStreamHandler(null);
+            eventChannel = null;
+        }
+        sink = null;
+        messenger = null;
+        context = null;
+        activity = null;
     }
 
     /**
@@ -123,19 +109,19 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
     }
 
     /**
-     * Handles configuration-change detachment without updating the stored activity.
+     * Releases the old activity while it is recreated for a configuration change.
      */
     @Override
     public void onDetachedFromActivityForConfigChanges() {
-
+        activity = null;
     }
 
     /**
-     * Handles configuration-change reattachment without updating the stored activity.
+     * Restores the activity after it is recreated for a configuration change.
      */
     @Override
     public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding activityPluginBinding) {
-
+        activity = activityPluginBinding.getActivity();
     }
 
     /**
@@ -148,60 +134,60 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
 
     /**
      * Dispatches reader configuration, open, close, and event-channel requests.
-     * Supported calls perform their side effects without completing {@code result};
-     * unknown calls are reported as not implemented.
+     * Completes every supported method call exactly once.
      */
     @Override
     public void onMethodCall(MethodCall call, Result result) {
 
         if (call.method.equals("setConfig")) {
-            Map<String, Object> arguments = (Map<String, Object>) call.arguments;
-            String identifier = arguments.get("identifier").toString();
-            String themeColor = arguments.get("themeColor").toString();
-            String scrollDirection = arguments.get("scrollDirection").toString();
-            Boolean nightMode = Boolean.parseBoolean(arguments.get("nightMode").toString());
-            Boolean allowSharing = Boolean.parseBoolean(arguments.get("allowSharing").toString());
-            Boolean enableTts = Boolean.parseBoolean(arguments.get("enableTts").toString());
-            config = new ReaderConfig(context, identifier, themeColor,
-                    scrollDirection, allowSharing, enableTts, nightMode);
+            try {
+                Map<String, Object> arguments = (Map<String, Object>) call.arguments;
+                String identifier = arguments.get("identifier").toString();
+                String themeColor = arguments.get("themeColor").toString();
+                String scrollDirection = arguments.get("scrollDirection").toString();
+                Boolean nightMode = Boolean.parseBoolean(arguments.get("nightMode").toString());
+                Boolean allowSharing = Boolean.parseBoolean(arguments.get("allowSharing").toString());
+                Boolean enableTts = Boolean.parseBoolean(arguments.get("enableTts").toString());
+                config = new ReaderConfig(context, identifier, themeColor,
+                        scrollDirection, allowSharing, enableTts, nightMode);
+                result.success(null);
+            } catch (Exception exception) {
+                result.error("configuration_failed", exception.getMessage(), null);
+            }
 
         } else if (call.method.equals("open")) {
+            try {
+                Map<String, Object> arguments = (Map<String, Object>) call.arguments;
+                String bookPath = arguments.get("bookPath").toString();
+                String lastLocation = arguments.get("lastLocation").toString();
 
-            Map<String, Object> arguments = (Map<String, Object>) call.arguments;
-            String bookPath = arguments.get("bookPath").toString();
-            String lastLocation = arguments.get("lastLocation").toString();
+                if (config == null) {
+                    result.error("configuration_missing", "EPUB reader has not been configured.", null);
+                    return;
+                }
+                if (activity == null) {
+                    result.error("activity_unavailable", "No active Android activity is attached.", null);
+                    return;
+                }
 
-            Log.i("opening", "In open function");
-
-            if (sink == null) {
-                Log.i("sink status", "sink is empty");
+                Log.i("opening", "In open function");
+                reader = new Reader(context, config, sink);
+                reader.open(bookPath, lastLocation, result);
+            } catch (Exception exception) {
+                result.error("open_failed", exception.getMessage(), null);
             }
-            reader = new Reader(context, messenger, config, sink);
-            reader.open(bookPath, lastLocation);
 
         } else if (call.method.equals("close")) {
-            reader.close();
+            try {
+                if (reader != null) {
+                    reader.close();
+                }
+                result.success(null);
+            } catch (Exception exception) {
+                result.error("close_failed", exception.getMessage(), null);
+            }
         } else if (call.method.equals("setChannel")) {
-            eventChannel = new EventChannel(messenger, "page");
-            eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
-
-                /**
-                 * Stores the event sink used to send reading positions to Flutter.
-                 */
-                @Override
-                public void onListen(Object o, EventChannel.EventSink eventSink) {
-
-                    sink = eventSink;
-                }
-
-                /**
-                 * Leaves the stored event sink unchanged when the stream is cancelled.
-                 */
-                @Override
-                public void onCancel(Object o) {
-
-                }
-            });
+            result.success(null);
         } else {
             result.notImplemented();
         }

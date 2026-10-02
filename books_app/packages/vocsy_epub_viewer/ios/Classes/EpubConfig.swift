@@ -14,7 +14,6 @@ class EpubConfig: NSObject {
     
     open var tintColor: UIColor = UIColor.init(rgba:"#fdd82c")
     open var allowSharing: Bool = false
-    open var scrollDirection: FolioReaderScrollDirection = FolioReaderScrollDirection.vertical
     
     init(Identifier: String,tintColor: String, allowSharing: Bool,
             scrollDirection: String, enableTts: Bool, nightMode: Bool) {
@@ -36,10 +35,9 @@ class EpubConfig: NSObject {
         self.readerConfiguration()
     }
     
+    // Locally patched to retain the caller's scroll and TTS settings.
     private func readerConfiguration() {
         self.config.shouldHideNavigationOnTap = false
-        self.config.scrollDirection = self.scrollDirection
-        self.config.enableTTS = false
         self.config.displayTitle = true
         self.config.allowSharing = self.allowSharing
         self.config.tintColor = self.tintColor

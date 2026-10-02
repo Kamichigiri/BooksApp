@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import EpubViewerKit
 
+// Locally patched for method results, event registration, and scene-aware presentation.
 public class SwiftEpubViewerPlugin: NSObject, FlutterPlugin,FolioReaderPageDelegate,FlutterStreamHandler {
     
     let folioReader = FolioReader()
@@ -18,66 +19,137 @@ public class SwiftEpubViewerPlugin: NSObject, FlutterPlugin,FolioReaderPageDeleg
         
       pageChannel = FlutterEventChannel.init(name: "page",
                                   binaryMessenger: registrar.messenger());
+        pageChannel?.setStreamHandler(instance)
       
-      registrar.addMethodCallDelegate(instance, channel: channel)
-    }
+        registrar.addMethodCallDelegate(instance, channel: channel)
+      }
 
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-      
+      public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        switch call.method {
+        case "setConfig":
+          guard let arguments = call.arguments as? [String: Any],
+                let identifier = arguments["identifier"] as? String,
+                let scrollDirection = arguments["scrollDirection"] as? String,
+                let color = arguments["themeColor"] as? String,
+                let allowSharing = arguments["allowSharing"] as? Bool,
+                let enableTts = arguments["enableTts"] as? Bool,
+                let nightMode = arguments["nightMode"] as? Bool else {
+              result(FlutterError(
+                  code: "invalid_configuration",
+                  message: "Invalid EPUB reader configuration.",
+                  details: nil
+              ))
+              return
+          }
 
-      switch call.method {
-      case "setConfig":
-        let arguments = call.arguments as![String:Any]
-        let Identifier = arguments["identifier"] as! String
-        let scrollDirection = arguments["scrollDirection"] as! String
-        let color = arguments["themeColor"] as! String
-        let allowSharing = arguments["allowSharing"] as! Bool
-        let enableTts = arguments["enableTts"] as! Bool
-        let nightMode = arguments["nightMode"] as! Bool
-
-        self.config = EpubConfig.init(Identifier: Identifier,tintColor: color,allowSharing:
-            allowSharing,scrollDirection: scrollDirection, enableTts: enableTts, nightMode: nightMode)
-
-        break
-      case "open":
-          setPageHandler()
-          let arguments = call.arguments as![String:Any]
-          let bookPath = arguments["bookPath"] as! String
-          self.open(epubPath: bookPath)
-
-          break
-      case "close":
+          self.config = EpubConfig(
+              Identifier: identifier,
+              tintColor: color,
+              allowSharing: allowSharing,
+              scrollDirection: scrollDirection,
+              enableTts: enableTts,
+              nightMode: nightMode
+          )
+          result(nil)
+        case "setChannel":
+          result(nil)
+        case "open":
+          guard let arguments = call.arguments as? [String: Any],
+                let bookPath = arguments["bookPath"] as? String else {
+              result(FlutterError(
+                  code: "invalid_book_path",
+                  message: "A local EPUB path is required.",
+                  details: nil
+              ))
+              return
+          }
+          do {
+              try self.open(epubPath: bookPath)
+              result(nil)
+          } catch let error as NSError {
+              result(FlutterError(
+                  code: "open_failed",
+                  message: error.localizedDescription,
+                  details: nil
+              ))
+          }
+        case "close":
           self.close()
-          break
-      default:
-          break
-      }
-  //    result("iOS " + UIDevice.current.systemVersion)
+          result(nil)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
     }
-      
-      private func setPageHandler(){
-          SwiftEpubViewerPlugin.pageChannel?.setStreamHandler(self)
 
-      }
-      
-      public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-          SwiftEpubViewerPlugin.pageResult = events
+        public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+            SwiftEpubViewerPlugin.pageResult = events
           return nil
       }
 
       public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+          SwiftEpubViewerPlugin.pageResult = nil
           return nil
       }
       
       
-      fileprivate func open(epubPath: String) {
-           if epubPath == "" {
-              return
+      private func open(epubPath: String) throws {
+          guard !epubPath.isEmpty,
+                FileManager.default.fileExists(atPath: epubPath) else {
+              throw NSError(
+                  domain: "vocsy_epub_viewer",
+                  code: 1,
+                  userInfo: [NSLocalizedDescriptionKey: "The EPUB file does not exist."]
+              )
+          }
+          guard let config = self.config?.config else {
+              throw NSError(
+                  domain: "vocsy_epub_viewer",
+                  code: 2,
+                  userInfo: [NSLocalizedDescriptionKey: "EPUB reader has not been configured."]
+              )
+          }
+          guard let readerVc = activeViewController() else {
+              throw NSError(
+                  domain: "vocsy_epub_viewer",
+                  code: 3,
+                  userInfo: [NSLocalizedDescriptionKey: "No active application window is available."]
+              )
           }
 
-          let readerVc = UIApplication.shared.keyWindow!.rootViewController ?? UIViewController()
-          folioReader.presentReader(parentViewController: readerVc, withEpubPath: epubPath, andConfig: self.config!.config, shouldRemoveEpub: false)
+          folioReader.presentReader(
+              parentViewController: readerVc,
+              withEpubPath: epubPath,
+              andConfig: config,
+              shouldRemoveEpub: false
+          )
           folioReader.readerCenter?.pageDelegate = self
+      }
+
+      private func activeViewController() -> UIViewController? {
+          let rootViewController: UIViewController?
+          if #available(iOS 13.0, *) {
+              let activeScenes = UIApplication.shared.connectedScenes
+                  .compactMap { $0 as? UIWindowScene }
+                  .filter { $0.activationState == .foregroundActive }
+              let activeWindows = activeScenes.flatMap { $0.windows }
+              rootViewController = activeWindows
+                  .first(where: { $0.isKeyWindow })?.rootViewController
+                  ?? activeWindows.first(where: { !$0.isHidden })?.rootViewController
+          } else if let appDelegate = UIApplication.shared.delegate {
+              if let window = appDelegate.window {
+                  rootViewController = window.rootViewController
+              } else {
+                  rootViewController = nil
+              }
+          } else {
+              rootViewController = nil
+          }
+
+          var viewController = rootViewController
+          while let presentedViewController = viewController?.presentedViewController {
+              viewController = presentedViewController
+          }
+          return viewController
       }
 
       public func pageWillLoad(_ page: FolioReaderPage) {
