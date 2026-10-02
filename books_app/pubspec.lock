@@ -680,10 +680,9 @@ packages:
   vocsy_epub_viewer:
     dependency: "direct main"
     description:
-      name: vocsy_epub_viewer
-      sha256: "4fe32c3f3e2841448423e3c309d12793146bc96f25571153a1d618ddb352b90a"
-      url: "https://pub.dev"
-    source: hosted
+      path: packages/vocsy_epub_viewer
+      relative: true
+    source: path
     version: "3.0.0"
   web:
     dependency: transitive

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:books_app/domain/database/app_database.dart';
 import 'package:books_app/domain/models/books.dart';
 import 'package:books_app/widgets/bar_icons.dart';
@@ -103,6 +105,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   // ── PDF Controller ─────────────────────────────────────────────────────────
   final PdfViewerController _pdfController = PdfViewerController();
   PdfScrollDirection _pdfScrollDirection = PdfScrollDirection.horizontal;
+  StreamSubscription<dynamic>? _epubLocatorSubscription;
 
   // ── PageView controller for demo ───────────────────────────────────────────
   late PageController _demoPageController;
@@ -168,6 +171,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _bookmarkPanelAnimCtrl.dispose();
     _pdfController.dispose();
     _demoPageController.dispose();
+    unawaited(_epubLocatorSubscription?.cancel());
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -263,7 +267,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
 
     try {
-      VocsyEpub.setConfig(
+      await VocsyEpub.setConfig(
         themeColor: Theme.of(context).primaryColor,
         identifier: (_book.id ?? _book.name.hashCode).toString(),
         scrollDirection: EpubScrollDirection.ALLDIRECTIONS,
@@ -272,9 +276,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         nightMode: _theme == ReaderTheme.dark,
       );
 
-      VocsyEpub.locatorStream.listen((locator) {
-        debugPrint('EPUB locator: $locator');
-      });
+      _epubLocatorSubscription ??= VocsyEpub.locatorStream.listen(
+        (locator) => debugPrint('EPUB locator: $locator'),
+      );
 
       await VocsyEpub.open(
         _book.filePath!,

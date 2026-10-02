@@ -9,9 +9,7 @@
         android:label="books_app"
         android:name="${applicationName}"
         android:icon="@mipmap/books_app_icon"
-        android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
-        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="28">
         <activity
             android:name=".MainActivity"
