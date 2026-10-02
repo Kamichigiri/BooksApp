@@ -37,6 +37,7 @@ dependencies:
 
   # PDF viewer — full-featured, supports local files and URLs
   syncfusion_flutter_pdfviewer: ^27.1.53
+  syncfusion_flutter_pdf: ^27.1.53
 
   # EPUB viewer
   vocsy_epub_viewer: 3.0.0
@@ -51,6 +52,9 @@ dependencies:
   sqflite: ^2.3.3+1
   path: ^1.9.0
 
+  # Ebup reader
+  epubx: ^4.0.0
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AppDatabase — singleton SQLite wrapper
-// Tables: books · bookmarks
+// Tables: books · bookmarks · chapters
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppDatabase {
@@ -71,6 +71,17 @@ class AppDatabase {
     ),
   ];
 
+  /// Sample chapters for default books
+  static const List<Map<String, dynamic>> _sampleChapters = [
+    {'title': 'Introduction', 'page': 1},
+    {'title': 'Chapter 1 — Origins', 'page': 3},
+    {'title': 'Chapter 2 — The Turning Point', 'page': 7},
+    {'title': 'Chapter 3 — Into the Unknown', 'page': 11},
+    {'title': 'Chapter 4 — Resolution', 'page': 15},
+    {'title': 'Epilogue', 'page': 18},
+    {'title': 'Bibliography', 'page': 20},
+  ];
+
   Future<Database> get database async {
     _db ??= await _openDatabase();
     return _db!;
@@ -84,12 +95,13 @@ class AppDatabase {
 
     return openDatabase(
       fullPath,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         // Enforce SQLite foreign key constraints (cascading deletes)
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -127,20 +139,83 @@ class AppDatabase {
     await db.execute(
         'CREATE INDEX idx_bookmarks_book_id ON bookmarks(book_id)');
 
-    // Seed default sample books
+    // ── chapters table ─────────────────────────────────────────────────────────
+    await db.execute('''
+      CREATE TABLE chapters (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id       INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+        title         TEXT    NOT NULL,
+        page_number   INTEGER NOT NULL DEFAULT 1,
+        chapter_order INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute(
+        'CREATE INDEX idx_chapters_book_id ON chapters(book_id)');
+
+    // Seed default sample books and chapters
     await _seedDefaultBooks(db);
   }
 
-  /// Populate default books in a single batch
-  Future<void> _seedDefaultBooks(DatabaseExecutor db) async {
-    final batch = db.batch();
-    for (final book in initialBooks) {
-      batch.insert('books', book.toMap());
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS chapters (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          book_id       INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+          title         TEXT    NOT NULL,
+          page_number   INTEGER NOT NULL DEFAULT 1,
+          chapter_order INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_chapters_book_id ON chapters(book_id)');
+
+      // Seed chapters for existing sample books if any
+      final books = await db.query('books');
+      for (final row in books) {
+        final bookId = row['id'] as int;
+        final existingCount = Sqflite.firstIntValue(await db.rawQuery(
+              'SELECT COUNT(*) FROM chapters WHERE book_id = ?',
+              [bookId],
+            )) ??
+            0;
+        if (existingCount == 0) {
+          final batch = db.batch();
+          for (int i = 0; i < _sampleChapters.length; i++) {
+            final ch = _sampleChapters[i];
+            batch.insert('chapters', {
+              'book_id': bookId,
+              'title': ch['title'],
+              'page_number': ch['page'],
+              'chapter_order': i,
+            });
+          }
+          await batch.commit(noResult: true);
+        }
+      }
     }
-    await batch.commit(noResult: true);
   }
 
-  /// Ensure initial books exist if the table was emptied or created previously
+  /// Populate default books and their chapters
+  Future<void> _seedDefaultBooks(DatabaseExecutor db) async {
+    for (final book in initialBooks) {
+      final bookId = await db.insert('books', book.toMap());
+      final batch = db.batch();
+      for (int i = 0; i < _sampleChapters.length; i++) {
+        final ch = _sampleChapters[i];
+        batch.insert('chapters', {
+          'book_id': bookId,
+          'title': ch['title'],
+          'page_number': ch['page'],
+          'chapter_order': i,
+        });
+      }
+      await batch.commit(noResult: true);
+    }
+  }
+
+  /// Ensure initial books and chapters exist if the table was emptied or created previously
   Future<void> seedInitialDataIfEmpty() async {
     final db = await database;
     final count = Sqflite.firstIntValue(
@@ -192,7 +267,7 @@ class AppDatabase {
     );
   }
 
-  /// Delete a book and all its bookmarks (CASCADE handled by SQLite).
+  /// Delete a book and all its bookmarks and chapters (CASCADE handled by SQLite).
   Future<void> deleteBook(int id) async {
     final db = await database;
     await db.delete('books', where: 'id = ?', whereArgs: [id]);
@@ -284,6 +359,47 @@ class AppDatabase {
       await db.rawQuery(
           'SELECT COUNT(*) FROM bookmarks WHERE book_id = ?', [bookId]),
     ) ?? 0;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Chapter CRUD
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /// Insert a single chapter. Returns the new row's [id].
+  Future<int> insertChapter(Chapter chapter) async {
+    final db = await database;
+    return db.insert('chapters', chapter.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Batch insert chapters for a book
+  Future<void> insertChapters(List<Chapter> chapters) async {
+    if (chapters.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final chapter in chapters) {
+      batch.insert('chapters', chapter.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Retrieve all chapters for a book, ordered by chapter_order
+  Future<List<Chapter>> getChaptersForBook(int bookId) async {
+    final db = await database;
+    final rows = await db.query(
+      'chapters',
+      where: 'book_id = ?',
+      whereArgs: [bookId],
+      orderBy: 'chapter_order ASC, page_number ASC',
+    );
+    return rows.map(Chapter.fromMap).toList();
+  }
+
+  /// Delete all chapters for a book
+  Future<void> deleteChaptersForBook(int bookId) async {
+    final db = await database;
+    await db.delete('chapters', where: 'book_id = ?', whereArgs: [bookId]);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
