@@ -24,6 +24,9 @@ public class HighlightData implements HighLight {
     private String uuid;
     private String note;
 
+    /**
+     * Returns a diagnostic representation of all stored highlight fields.
+     */
     @Override
     public String toString() {
         return "HighlightData{" +
@@ -39,46 +42,73 @@ public class HighlightData implements HighLight {
                 '}';
     }
 
+    /**
+     * Returns the identifier of the book containing the highlight.
+     */
     @Override
     public String getBookId() {
         return bookId;
     }
 
+    /**
+     * Returns the highlighted text.
+     */
     @Override
     public String getContent() {
         return content;
     }
 
+    /**
+     * Returns the stored highlight date.
+     */
     @Override
     public Date getDate() {
         return date;
     }
 
+    /**
+     * Returns the stored highlight type.
+     */
     @Override
     public String getType() {
         return type;
     }
 
+    /**
+     * Returns the page number associated with the highlight.
+     */
     @Override
     public int getPageNumber() {
         return pageNumber;
     }
 
+    /**
+     * Returns the identifier of the page containing the highlight.
+     */
     @Override
     public String getPageId() {
         return pageId;
     }
 
+    /**
+     * Returns the serialized Rangy selection range.
+     */
     @Override
     public String getRangy() {
         return rangy;
     }
 
+    /**
+     * Returns the unique identifier of the highlight.
+     */
     @Override
     public String getUUID() {
         return uuid;
     }
 
+    /**
+     * Returns the note attached to the highlight.
+     */
     @Override
     public String getNote() {
         return note;

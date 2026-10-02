@@ -17,6 +17,17 @@ public class ReaderConfig {
 
     public Config config;
 
+    /**
+     * Builds the FolioReader configuration from the supported Android options.
+     *
+     * @param context application context; currently unused
+     * @param identifier book identifier; currently unused
+     * @param themeColor color string accepted by {@link Color#parseColor(String)}
+     * @param scrollDirection vertical, horizontal, or any other value for both directions
+     * @param allowSharing sharing preference; currently unused
+     * @param showTts whether to show text-to-speech controls
+     * @param nightMode whether to enable night mode
+     */
     public ReaderConfig(Context context, String identifier, String themeColor,
                         String scrollDirection, boolean allowSharing, boolean showTts , boolean nightMode){
 

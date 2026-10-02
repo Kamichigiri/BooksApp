@@ -46,6 +46,9 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
         messenger = registrar.messenger();
         new EventChannel(messenger, "page").setStreamHandler(new EventChannel.StreamHandler() {
 
+            /**
+             * Stores the event sink used to send reading positions to Flutter.
+             */
             @Override
             public void onListen(Object o, EventChannel.EventSink eventSink) {
 
@@ -55,6 +58,9 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
                 }
             }
 
+            /**
+             * Leaves the stored event sink unchanged when the stream is cancelled.
+             */
             @Override
             public void onCancel(Object o) {
 
@@ -67,12 +73,18 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
 
     }
 
+    /**
+     * Registers the method and page-event channels with the Flutter engine.
+     */
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
         messenger = binding.getBinaryMessenger();
         context = binding.getApplicationContext();
         new EventChannel(messenger, "page").setStreamHandler(new EventChannel.StreamHandler() {
 
+            /**
+             * Stores the event sink used to send reading positions to Flutter.
+             */
             @Override
             public void onListen(Object o, EventChannel.EventSink eventSink) {
 
@@ -82,6 +94,9 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
                 }
             }
 
+            /**
+             * Leaves the stored event sink unchanged when the stream is cancelled.
+             */
             @Override
             public void onCancel(Object o) {
 
@@ -91,31 +106,51 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
         channel.setMethodCallHandler(this);
     }
 
+    /**
+     * Handles engine detachment without releasing the stored channel references.
+     */
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         // TODO: your plugin is no longer attached to a Flutter experience.
     }
 
+    /**
+     * Stores the activity supplied by the Flutter activity binding.
+     */
     @Override
     public void onAttachedToActivity(@NonNull ActivityPluginBinding activityPluginBinding) {
         activity = activityPluginBinding.getActivity();
     }
 
+    /**
+     * Handles configuration-change detachment without updating the stored activity.
+     */
     @Override
     public void onDetachedFromActivityForConfigChanges() {
 
     }
 
+    /**
+     * Handles configuration-change reattachment without updating the stored activity.
+     */
     @Override
     public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding activityPluginBinding) {
 
     }
 
+    /**
+     * Clears the stored activity when the plugin detaches.
+     */
     @Override
     public void onDetachedFromActivity() {
         activity = null;
     }
 
+    /**
+     * Dispatches reader configuration, open, close, and event-channel requests.
+     * Supported calls perform their side effects without completing {@code result};
+     * unknown calls are reported as not implemented.
+     */
     @Override
     public void onMethodCall(MethodCall call, Result result) {
 
@@ -150,12 +185,18 @@ public class EpubViewerPlugin implements MethodCallHandler, FlutterPlugin, Activ
             eventChannel = new EventChannel(messenger, "page");
             eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
 
+                /**
+                 * Stores the event sink used to send reading positions to Flutter.
+                 */
                 @Override
                 public void onListen(Object o, EventChannel.EventSink eventSink) {
 
                     sink = eventSink;
                 }
 
+                /**
+                 * Leaves the stored event sink unchanged when the stream is cancelled.
+                 */
                 @Override
                 public void onCancel(Object o) {
 

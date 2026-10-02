@@ -36,6 +36,10 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
     private ReadLocator read_locator;
     private static final String PAGE_CHANNEL = "sage";
 
+    /**
+     * Creates a reader with the supplied configuration and locator event sink.
+     * Starts loading bundled highlights and registers the FolioReader callbacks.
+     */
     Reader(Context context, BinaryMessenger messenger, ReaderConfig config, EventChannel.EventSink sink) {
         this.context = context;
         readerConfig = config;
@@ -50,10 +54,19 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
         pageEventSink = sink;
     }
 
+    /**
+     * Starts a background task to open an EPUB and optionally restore its locator.
+     *
+     * @param bookPath path of the EPUB to open
+     * @param lastLocation locator JSON, or null or an empty string to skip restoration
+     */
     public void open(String bookPath, String lastLocation) {
         final String path = bookPath;
         final String location = lastLocation;
         new Thread(new Runnable() {
+            /**
+             * Restores a supplied locator and opens the book, logging any exception.
+             */
             @Override
             public void run() {
                 try {
@@ -72,10 +85,16 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
 
     }
 
+    /**
+     * Requests that FolioReader close the current book.
+     */
     public void close() {
         folioReader.close();
     }
 
+    /**
+     * Registers the legacy {@code sage} channel for locator events.
+     */
     private void setPageHandler(BinaryMessenger messenger) {
 //        final MethodChannel channel = new MethodChannel(registrar.messenger(), "page");
 //        channel.setMethodCallHandler(new EpubKittyPlugin());
@@ -86,6 +105,9 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
 
             eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
 
+                /**
+                 * Stores the event sink used to publish the final reading position.
+                 */
                 @Override
                 public void onListen(Object o, EventChannel.EventSink eventSink) {
 
@@ -97,6 +119,9 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
                     }
                 }
 
+                /**
+                 * Leaves the stored event sink unchanged when the stream is cancelled.
+                 */
                 @Override
                 public void onCancel(Object o) {
 
@@ -107,8 +132,14 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
         }
     }
 
+    /**
+     * Starts a background task to read the bundled highlight data.
+     */
     private void getHighlightsAndSave() {
         new Thread(new Runnable() {
+            /**
+             * Parses the bundled highlights and calls the save hook if the list is null.
+             */
             @Override
             public void run() {
                 ArrayList<HighLight> highlightList = null;
@@ -124,6 +155,9 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
 
                 if (highlightList == null) {
                     folioReader.saveReceivedHighLights(highlightList, new OnSaveHighlight() {
+                        /**
+                         * Receives highlight-save completion without performing additional work.
+                         */
                         @Override
                         public void onFinished() {
                             //You can do anything on successful saving highlight list
@@ -135,6 +169,12 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
     }
 
 
+    /**
+     * Reads an asset as text, joining its lines with newline characters.
+     *
+     * @param name asset path relative to the Android assets directory
+     * @return asset text, or null if the asset cannot be read
+     */
     private String loadAssetTextAsString(String name) {
         BufferedReader in = null;
         try {
@@ -166,6 +206,10 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
         return null;
     }
 
+    /**
+     * Logs the last saved locator and sends its JSON to an available event sink.
+     * Requires a locator to have been supplied through {@link #saveReadLocator}.
+     */
     @Override
     public void onFolioReaderClosed() {
         Log.i("readLocator", "-> saveReadLocator -> " + read_locator.toJson());
@@ -175,11 +219,17 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
         }
     }
 
+    /**
+     * Receives highlight changes without performing additional work.
+     */
     @Override
     public void onHighlight(HighLight highlight, HighLight.HighLightAction type) {
 
     }
 
+    /**
+     * Stores the latest locator for publication when the reader closes.
+     */
     @Override
     public void saveReadLocator(ReadLocator readLocator) {
         read_locator = readLocator;
