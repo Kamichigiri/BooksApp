@@ -2,7 +2,20 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
+    // configurations.all {
+    //     resolutionStrategy {
+    //         force 'com.github.codetoart:r2-streamer-kotlin:1.0.3-7'
+    //     }
+    // }
+    configurations.configureEach {
+        resolutionStrategy.dependencySubstitution {
+            substitute module("com.github.NanoHttpd.nanohttpd:nanohttpd") using module("org.nanohttpd:nanohttpd:2.3.1")
+            substitute module("com.github.NanoHttpd.nanohttpd:nanohttpd-nanolets") using module("org.nanohttpd:nanohttpd-nanolets:2.3.1")
+        }
+    }
+
 }
 
 rootProject.buildDir = "../build"

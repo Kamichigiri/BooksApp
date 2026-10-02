@@ -276,7 +276,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         debugPrint('EPUB locator: $locator');
       });
 
-      await VocsyEpub.open(
+      VocsyEpub.open(
         _book.filePath!,
         lastLocation: null,
       );
