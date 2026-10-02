@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:vocsy_epub_viewer/epub_viewer.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reader Theming
@@ -152,6 +153,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         CurvedAnimation(parent: _bookmarkPanelAnimCtrl, curve: Curves.easeOut));
 
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _book.fileType == BookFileType.epub) {
+        _openEpubReader();
+      }
+    });
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
@@ -245,6 +251,41 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ? PdfScrollDirection.horizontal
           : PdfScrollDirection.vertical;
     });
+  }
+
+  Future<void> _openEpubReader() async {
+    if (_book.filePath == null || _book.filePath!.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No EPUB file is available to open.')),
+      );
+      return;
+    }
+
+    try {
+      VocsyEpub.setConfig(
+        themeColor: Theme.of(context).primaryColor,
+        identifier: (_book.id ?? _book.name.hashCode).toString(),
+        scrollDirection: EpubScrollDirection.ALLDIRECTIONS,
+        allowSharing: true,
+        enableTts: false,
+        nightMode: _theme == ReaderTheme.dark,
+      );
+
+      VocsyEpub.locatorStream.listen((locator) {
+        debugPrint('EPUB locator: $locator');
+      });
+
+      await VocsyEpub.open(
+        _book.filePath!,
+        lastLocation: null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to open EPUB: $e')),
+      );
+    }
   }
 
   bool get _isCurrentPageBookmarked =>
@@ -440,14 +481,39 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   Widget _buildEpubPlaceholder(Color fgColor) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.menu_book_rounded,
-              size: 72, color: fgColor.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          Text('Opening EPUB…', style: TextStyle(color: fgColor, fontSize: 16)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.menu_book_rounded,
+                size: 72, color: fgColor.withValues(alpha: 0.3)),
+            const SizedBox(height: 16),
+            Text(
+              'Open EPUB Reader',
+              style: TextStyle(color: fgColor, fontSize: 18),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Tap below to launch the native EPUB viewer.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: fgColor.withValues(alpha: 0.72),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _openEpubReader,
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('Open EPUB'),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
