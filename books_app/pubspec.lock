@@ -680,7 +680,7 @@ packages:
   vocsy_epub_viewer:
     dependency: "direct main"
     description:
-      path: packages/vocsy_epub_viewer
+      path: "packages/vocsy_epub_viewer"
       relative: true
     source: path
     version: "3.0.0"
