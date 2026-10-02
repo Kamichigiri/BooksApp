@@ -301,3 +301,64 @@ class Bookmark {
 
 /// Type alias for backward compatibility with reader widgets
 typedef BookBookmark = Bookmark;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chapter (Table of Contents entry)
+// Fields: id · bookId · title · pageNumber · chapterOrder
+// ─────────────────────────────────────────────────────────────────────────────
+
+class Chapter {
+  final int? id;
+  final int bookId;
+  final String title;
+  final int pageNumber; // 1-indexed page for viewer jump
+  final int chapterOrder;
+
+  const Chapter({
+    this.id,
+    required this.bookId,
+    required this.title,
+    required this.pageNumber,
+    this.chapterOrder = 0,
+  });
+
+  Map<String, dynamic> toMap() {
+    final map = <String, dynamic>{
+      'book_id': bookId,
+      'title': title,
+      'page_number': pageNumber,
+      'chapter_order': chapterOrder,
+    };
+    if (id != null) map['id'] = id;
+    return map;
+  }
+
+  factory Chapter.fromMap(Map<String, dynamic> map) => Chapter(
+        id: map['id'] as int?,
+        bookId: map['book_id'] as int,
+        title: map['title'] as String? ?? 'Untitled Chapter',
+        pageNumber: map['page_number'] as int? ?? 1,
+        chapterOrder: map['chapter_order'] as int? ?? 0,
+      );
+
+  Chapter copyWith({
+    int? id,
+    int? bookId,
+    String? title,
+    int? pageNumber,
+    int? chapterOrder,
+  }) {
+    return Chapter(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      title: title ?? this.title,
+      pageNumber: pageNumber ?? this.pageNumber,
+      chapterOrder: chapterOrder ?? this.chapterOrder,
+    );
+  }
+
+  @override
+  String toString() =>
+      'Chapter(id: $id, bookId: $bookId, title: "$title", page: $pageNumber)';
+}
+
