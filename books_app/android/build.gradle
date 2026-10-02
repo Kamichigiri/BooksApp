@@ -4,6 +4,7 @@ allprojects {
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
     }
+
     // configurations.all {
     //     resolutionStrategy {
     //         force 'com.github.codetoart:r2-streamer-kotlin:1.0.3-7'
