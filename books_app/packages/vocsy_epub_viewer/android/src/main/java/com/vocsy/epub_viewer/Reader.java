@@ -1,6 +1,8 @@
 package com.vocsy.epub_viewer;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -20,7 +22,6 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodChannel;
 
@@ -29,23 +30,18 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
     private ReaderConfig readerConfig;
     public FolioReader folioReader;
     private Context context;
-    public MethodChannel.Result result;
-    private EventChannel eventChannel;
     private EventChannel.EventSink pageEventSink;
-    private BinaryMessenger messenger;
     private ReadLocator read_locator;
-    private static final String PAGE_CHANNEL = "sage";
 
     /**
      * Creates a reader with the supplied configuration and locator event sink.
      * Starts loading bundled highlights and registers the FolioReader callbacks.
      */
-    Reader(Context context, BinaryMessenger messenger, ReaderConfig config, EventChannel.EventSink sink) {
+    Reader(Context context, ReaderConfig config, EventChannel.EventSink sink) {
         this.context = context;
         readerConfig = config;
 
         getHighlightsAndSave();
-        //setPageHandler(messenger);
 
         folioReader = FolioReader.get()
                 .setOnHighlightListener(this)
@@ -60,29 +56,36 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
      * @param bookPath path of the EPUB to open
      * @param lastLocation locator JSON, or null or an empty string to skip restoration
      */
-    public void open(String bookPath, String lastLocation) {
+    /**
+     * Locally patched to return background open failures through the method result.
+     */
+    public void open(String bookPath, String lastLocation, MethodChannel.Result result) {
         final String path = bookPath;
         final String location = lastLocation;
-        new Thread(new Runnable() {
-            /**
-             * Restores a supplied locator and opens the book, logging any exception.
-             */
-            @Override
-            public void run() {
-                try {
-                    Log.i("SavedLocation", "-> savedLocation -> " + location);
-                    if (location != null && !location.isEmpty()) {
-                        ReadLocator readLocator = ReadLocator.fromJson(location);
-                        folioReader.setReadLocator(readLocator);
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        Thread worker = new Thread(() -> {
+            try {
+                Log.i("SavedLocation", "-> savedLocation -> " + location);
+                ReadLocator locator = location == null || location.isEmpty()
+                        ? null : ReadLocator.fromJson(location);
+                mainHandler.post(() -> {
+                    try {
+                        if (locator != null) {
+                            folioReader.setReadLocator(locator);
+                        }
+                        folioReader.setConfig(readerConfig.config, true).openBook(path);
+                        result.success(null);
+                    } catch (Exception exception) {
+                        result.error("open_failed", exception.getMessage(), null);
                     }
-                    folioReader.setConfig(readerConfig.config, true)
-                            .openBook(path);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                });
+            } catch (Exception exception) {
+                mainHandler.post(() ->
+                        result.error("open_failed", exception.getMessage(), null));
             }
-        }).start();
-
+        });
+        worker.setName("vocsy-epub-open");
+        worker.start();
     }
 
     /**
@@ -90,46 +93,6 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
      */
     public void close() {
         folioReader.close();
-    }
-
-    /**
-     * Registers the legacy {@code sage} channel for locator events.
-     */
-    private void setPageHandler(BinaryMessenger messenger) {
-//        final MethodChannel channel = new MethodChannel(registrar.messenger(), "page");
-//        channel.setMethodCallHandler(new EpubKittyPlugin());
-        Log.i("event sink is", "in set page handler:");
-        eventChannel = new EventChannel(messenger, PAGE_CHANNEL);
-
-        try {
-
-            eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
-
-                /**
-                 * Stores the event sink used to publish the final reading position.
-                 */
-                @Override
-                public void onListen(Object o, EventChannel.EventSink eventSink) {
-
-                    Log.i("event sink is", "this is eveent sink:");
-
-                    pageEventSink = eventSink;
-                    if (pageEventSink == null) {
-                        Log.i("empty", "Sink is empty");
-                    }
-                }
-
-                /**
-                 * Leaves the stored event sink unchanged when the stream is cancelled.
-                 */
-                @Override
-                public void onCancel(Object o) {
-
-                }
-            });
-        } catch (Error err) {
-            Log.i("and error", "error is " + err.toString());
-        }
     }
 
     /**
@@ -207,15 +170,16 @@ public class Reader implements OnHighlightListener, ReadLocatorListener, FolioRe
     }
 
     /**
-     * Logs the last saved locator and sends its JSON to an available event sink.
-     * Requires a locator to have been supplied through {@link #saveReadLocator}.
+     * Sends the last saved locator to an available event sink when one exists.
      */
     @Override
     public void onFolioReaderClosed() {
-        Log.i("readLocator", "-> saveReadLocator -> " + read_locator.toJson());
-
-        if (pageEventSink != null) {
-            pageEventSink.success(read_locator.toJson());
+        if (read_locator != null) {
+            String locatorJson = read_locator.toJson();
+            Log.i("readLocator", "-> saveReadLocator -> " + locatorJson);
+            if (pageEventSink != null) {
+                pageEventSink.success(locatorJson);
+            }
         }
     }
 

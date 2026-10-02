@@ -275,6 +275,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         enableTts: false,
         nightMode: _theme == ReaderTheme.dark,
       );
+      if (!mounted) return;
 
       _epubLocatorSubscription ??= VocsyEpub.locatorStream.listen(
         (locator) => debugPrint('EPUB locator: $locator'),
